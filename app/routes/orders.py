@@ -10,13 +10,24 @@ orders_bp = Blueprint("orders", __name__)
 def create_order():
     data = request.get_json()
 
+    if not data:
+        return jsonify({"error": "Request body must be valid JSON"}), 400
+
+    missing = [f for f in ("product_id", "quantity") if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
     product = Product.query.get(data["product_id"])
     if not product:
         return jsonify({"error": "Product not found"}), 404
 
     quantity = data["quantity"]
+    if not isinstance(quantity, int) or quantity <= 0:
+        return jsonify({"error": "quantity must be a positive integer"}), 400
 
-    # BUG: No check if sufficient stock is available
+    if product.quantity < quantity:
+        return jsonify({"error": "Insufficient stock"}), 400
+
     product.quantity -= quantity
 
     order = Order(
