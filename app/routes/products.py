@@ -15,13 +15,29 @@ def list_products():
 def create_product():
     data = request.get_json()
 
-    # BUG: No input validation - missing required fields not checked
+    if not data:
+        return jsonify({"error": "Request body must be valid JSON"}), 400
+
+    missing = [f for f in ("name", "sku", "price") if f not in data]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    if not isinstance(data["price"], (int, float)) or data["price"] < 0:
+        return jsonify({"error": "price must be a non-negative number"}), 400
+
+    quantity = data.get("quantity", 0)
+    if not isinstance(quantity, int) or quantity < 0:
+        return jsonify({"error": "quantity must be a non-negative integer"}), 400
+
+    if Product.query.filter_by(sku=data["sku"]).first():
+        return jsonify({"error": "A product with that SKU already exists"}), 400
+
     product = Product(
         name=data["name"],
         sku=data["sku"],
         price=data["price"],
         description=data.get("description", ""),
-        quantity=data.get("quantity", 0),
+        quantity=quantity,
         low_stock_threshold=data.get("low_stock_threshold", 10),
     )
 
@@ -35,8 +51,7 @@ def create_product():
 def get_product(product_id):
     product = Product.query.get(product_id)
     if not product:
-        # BUG: Returns 200 with None instead of proper 404
-        return jsonify({"error": "not found"}), 200
+        return jsonify({"error": "Product not found"}), 404
 
     return jsonify(product.to_dict())
 
@@ -48,6 +63,9 @@ def update_product(product_id):
         return jsonify({"error": "Product not found"}), 404
 
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be valid JSON"}), 400
+
     product.name = data.get("name", product.name)
     product.price = data.get("price", product.price)
     product.description = data.get("description", product.description)
@@ -66,12 +84,10 @@ def delete_product(product_id):
     db.session.delete(product)
     db.session.commit()
 
-    # BUG: No response body on successful delete
-    return "", 204
+    return jsonify({"message": "Product deleted"}), 200
 
 
 @products_bp.route("/inventory/low-stock", methods=["GET"])
 def low_stock_alerts():
-    # BUG: Hardcoded threshold instead of using product's own threshold
-    products = Product.query.filter(Product.quantity < 10).all()
+    products = Product.query.filter(Product.quantity < Product.low_stock_threshold).all()
     return jsonify([p.to_dict() for p in products])
