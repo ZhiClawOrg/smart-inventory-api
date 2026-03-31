@@ -10,13 +10,42 @@ orders_bp = Blueprint("orders", __name__)
 def create_order():
     data = request.get_json()
 
-    product = Product.query.get(data["product_id"])
+    # Validate request body exists
+    if data is None:
+        return jsonify({"error": "Request body is required"}), 400
+
+    # Validate required fields
+    if "product_id" not in data:
+        return jsonify({"error": "product_id is required"}), 400
+
+    if "quantity" not in data:
+        return jsonify({"error": "quantity is required"}), 400
+
+    # Validate data types
+    try:
+        product_id = int(data["product_id"])
+        quantity = int(data["quantity"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "product_id and quantity must be valid integers"}), 400
+
+    # Validate quantity is positive
+    if quantity <= 0:
+        return jsonify({"error": "quantity must be greater than 0"}), 400
+
+    # Check if product exists
+    product = Product.query.get(product_id)
     if not product:
         return jsonify({"error": "Product not found"}), 404
 
-    quantity = data["quantity"]
+    # Validate sufficient stock is available
+    if product.quantity < quantity:
+        return jsonify({
+            "error": "Insufficient stock",
+            "available": product.quantity,
+            "requested": quantity
+        }), 400
 
-    # BUG: No check if sufficient stock is available
+    # Update stock and create order
     product.quantity -= quantity
 
     order = Order(

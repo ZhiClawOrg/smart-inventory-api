@@ -15,18 +15,67 @@ def list_products():
 def create_product():
     data = request.get_json()
 
-    # BUG: No input validation - missing required fields not checked
+    # Validate request body exists
+    if data is None:
+        return jsonify({"error": "Request body is required"}), 400
+
+    # Validate required fields
+    if "name" not in data:
+        return jsonify({"error": "name is required"}), 400
+
+    if "sku" not in data:
+        return jsonify({"error": "sku is required"}), 400
+
+    if "price" not in data:
+        return jsonify({"error": "price is required"}), 400
+
+    # Validate data types and values
+    try:
+        price = float(data["price"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "price must be a valid number"}), 400
+
+    if price <= 0:
+        return jsonify({"error": "price must be greater than 0"}), 400
+
+    # Validate quantity if provided
+    quantity = data.get("quantity", 0)
+    try:
+        quantity = int(quantity)
+    except (ValueError, TypeError):
+        return jsonify({"error": "quantity must be a valid integer"}), 400
+
+    if quantity < 0:
+        return jsonify({"error": "quantity cannot be negative"}), 400
+
+    # Validate low_stock_threshold if provided
+    low_stock_threshold = data.get("low_stock_threshold", 10)
+    try:
+        low_stock_threshold = int(low_stock_threshold)
+    except (ValueError, TypeError):
+        return jsonify({"error": "low_stock_threshold must be a valid integer"}), 400
+
+    if low_stock_threshold < 0:
+        return jsonify({"error": "low_stock_threshold cannot be negative"}), 400
+
     product = Product(
         name=data["name"],
         sku=data["sku"],
-        price=data["price"],
+        price=price,
         description=data.get("description", ""),
-        quantity=data.get("quantity", 0),
-        low_stock_threshold=data.get("low_stock_threshold", 10),
+        quantity=quantity,
+        low_stock_threshold=low_stock_threshold,
     )
 
     db.session.add(product)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        # Check if it's a duplicate SKU error
+        if "UNIQUE constraint failed" in str(e) or "unique constraint" in str(e).lower():
+            return jsonify({"error": "Product with this SKU already exists"}), 400
+        return jsonify({"error": "Failed to create product"}), 500
 
     return jsonify(product.to_dict()), 201
 
