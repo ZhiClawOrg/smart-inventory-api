@@ -38,4 +38,11 @@ class TestProductEndpoints:
         assert result["name"] == "Widget A"
         assert result["sku"] == "WGT-001"
 
+    def test_get_product_not_found(self, client):
+        response = client.get("/api/v1/products/99999")
+        assert response.status_code == 404
+        result = response.get_json()
+        assert result["error"] == "Product not found"
+        assert result["status"] == 404
+
     # TODO: Add more tests for update, delete, error cases
