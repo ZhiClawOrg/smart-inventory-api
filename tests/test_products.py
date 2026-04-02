@@ -1,24 +1,3 @@
-import pytest
-from app import create_app, db
-
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-    app.config["TESTING"] = True
-
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
-
-
 class TestProductEndpoints:
     def test_list_products_empty(self, client):
         response = client.get("/api/v1/products")
@@ -37,6 +16,11 @@ class TestProductEndpoints:
         result = response.get_json()
         assert result["name"] == "Widget A"
         assert result["sku"] == "WGT-001"
+
+    def test_create_product_missing_required_fields(self, client):
+        response = client.post("/api/v1/products", json={"sku": "WGT-002"})
+        assert response.status_code == 400
+        assert response.get_json()["error"].startswith("Missing required fields")
 
     def test_get_product_not_found(self, client):
         response = client.get("/api/v1/products/99999")
