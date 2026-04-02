@@ -35,8 +35,7 @@ def create_product():
 def get_product(product_id):
     product = Product.query.get(product_id)
     if not product:
-        # BUG: Returns 200 with None instead of proper 404
-        return jsonify({"error": "not found"}), 200
+        return jsonify({"error": "Product not found", "status": 404}), 404
 
     return jsonify(product.to_dict())
 
